@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi[standard]>=0.116.1",
+    "jwt>=1.4.0",
+    "passlib>=1.7.4",
     "pydantic-settings>=2.10.1",
     "sqlmodel>=0.0.24",
 ]
