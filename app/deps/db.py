@@ -20,7 +20,7 @@ def get_db() -> Generator[Session, None, None]:
         yield session
 
 
-SessionDep = Annotated[Session, Depends(get_db)]
+SessionGet = Annotated[Session, Depends(get_db)]
 
 
 def create_user(session: Session, user_create: UserCreate) -> User:

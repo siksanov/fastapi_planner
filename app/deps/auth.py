@@ -17,7 +17,7 @@ context = CryptContext(schemes=['bcrypt'], deprecate='auto')
 
 ALGORITHM = 'HS256'
 
-TokenDep = Annotated[str, Depends(reusable_oauth2)]
+TokenGet = Annotated[str, Depends(reusable_oauth2)]
 
 
 def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
