@@ -41,3 +41,8 @@ async def register_user(
     user_create = UserCreate.validate(user_register)
     user = create_user(session, user_create)
     return user
+
+
+@router.get('/{id}', response_model=UserPublic | User)
+async def read_user(session: SessionGet, user_public: UserPublic):
+    pass
