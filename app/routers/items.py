@@ -53,4 +53,3 @@ async def new_item(
 ) -> ItemPublic:
     item = create_item(session, item_create, auth_user.id)
     return item
-
