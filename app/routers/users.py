@@ -1,5 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+import uuid
+from datetime import timedelta
+from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import select, func
+from typing import Annotated
 
 from models.user import (
     UsersPublic,
@@ -13,6 +17,7 @@ from deps.db import (
     get_user_by_email,
     create_user
 )
+from deps.auth import AuthUser, authenticate, create_access_token
 
 router = APIRouter(prefix='/users', tags='users')
 
@@ -43,6 +48,34 @@ async def register_user(
     return user
 
 
+@router.post('/signin')
+async def login_user(
+    session: SessionGet,
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+):
+    user = authenticate(session, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            'Неверный логин или пароль'
+        )
+    elif not user.is_active:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            'Пользователь деактивирован'
+        )
+    access_token_expires = timedelta(minutes=60)
+    token = create_access_token(user.id, access_token_expires)
+    return {'token': token, 'type': 'Bearer'}
+
+
 @router.get('/{id}', response_model=UserPublic | User)
-async def read_user(session: SessionGet, user_public: UserPublic):
-    pass
+async def read_user(
+    user_id: uuid.UUID,
+    session: SessionGet,
+    auth_user: AuthUser
+) -> UserPublic | User:
+    if user_id == auth_user.id:
+        return auth_user
+    user = session.get(User, user_id)
+    return UserPublic(**user)

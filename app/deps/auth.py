@@ -74,3 +74,6 @@ def auth_user(session: Session, token: TokenGet):
             'Пользователь неактивен'
         )
     return user
+
+
+AuthUser = Annotated[User, Depends(auth_user)]
