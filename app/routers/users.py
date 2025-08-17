@@ -33,6 +33,18 @@ async def read_users(
     return UsersPublic(count, users)
 
 
+@router.get('/{id}', response_model=UserPublic | User)
+async def read_user(
+    user_id: uuid.UUID,
+    session: SessionGet,
+    auth_user: AuthUser
+) -> UserPublic | User:
+    if user_id == auth_user.id:
+        return auth_user
+    user = session.get(User, user_id)
+    return UserPublic(**user)
+
+
 @router.post('/signup', response_model=UserPublic)
 async def register_user(
     session: SessionGet, user_register: UserRegister
@@ -43,7 +55,7 @@ async def register_user(
             status.HTTP_400_BAD_REQUEST,
             'Пользователь с таким адресом электронной почты \
                 уже существует в системе')
-    user_create = UserCreate.validate(user_register)
+    user_create = UserCreate.model_validate(user_register)
     user = create_user(session, user_create)
     return user
 
@@ -69,13 +81,28 @@ async def login_user(
     return {'token': token, 'type': 'Bearer'}
 
 
-@router.get('/{id}', response_model=UserPublic | User)
-async def read_user(
-    user_id: uuid.UUID,
+@router.patch('/{id}')
+async def recovery_auth_user():
+    pass
+
+
+@router.delete('/{id}', dependencies=AuthUser, response_model=dict)
+async def delete_user(
     session: SessionGet,
-    auth_user: AuthUser
-) -> UserPublic | User:
-    if user_id == auth_user.id:
-        return auth_user
-    user = session.get(User, user_id)
-    return UserPublic(**user)
+    auth_user: AuthUser,
+    id: uuid.UUID
+) -> dict:
+    user = session.get(User, id)
+    if not user:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            'Пользователь не найден'
+        )
+    if not auth_user.is_superuser or (user.id != auth_user.id):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            'Недостаточно прав'
+        )
+    session.delete(user)
+    session.commit()
+    return {'message': f'Элемент {id} удалён успешно'}
