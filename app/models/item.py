@@ -1,7 +1,7 @@
 import uuid
 from sqlmodel import SQLModel, Field, Relationship
 
-from user import User
+from app.models.user import User
 
 
 class ItemBase(SQLModel):
@@ -21,7 +21,7 @@ class Item(ItemBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     owner_id: uuid.UUID = Field(
         foreign_key='user.id', nullable=False, ondelete='CASCADE')
-    owner: User | None = Relationship(back_populates='items')
+    owner: User | None = Relationship(back_populates="items")
 
 
 class ItemPublic(ItemBase):

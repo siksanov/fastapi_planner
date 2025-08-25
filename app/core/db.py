@@ -1,16 +1,16 @@
 import uuid
 from collections.abc import Generator
+from passlib.context import CryptContext
 
 from sqlmodel import create_engine, SQLModel, Session, select
 from fastapi import Depends
 from typing import Annotated
-from auth import password_hash
-from models.user import User, UserCreate, UserUpdate
-from models.item import Item, ItemCreate
+from app.models.user import User, UserCreate, UserUpdate
+from app.models.item import Item, ItemCreate
 
 
 engine = create_engine(
-    'postgresql+psycopg//localhost:5432@postgres:postgres',
+    'postgresql+psycopg://postgres:postgres@localhost:5432/app',
     echo=True,)
 SQLModel.metadata.create_all(engine)
 
@@ -21,6 +21,15 @@ def get_db() -> Generator[Session, None, None]:
 
 
 SessionGet = Annotated[Session, Depends(get_db)]
+context = CryptContext(schemes=['bcrypt'])
+
+
+def verify_password(password: str, hashed_password: str):
+    return context.verify(password, hashed_password)
+
+
+def password_hash(password: str):
+    return context.hash(password)
 
 
 def create_user(session: Session, user_create: UserCreate) -> User:
@@ -50,7 +59,16 @@ def update_user(session: Session, db_user: User, user_in: UserUpdate) -> User:
 
 def get_user_by_email(session: Session, email: str) -> User | None:
     query = select(User).where(User.email == email)
-    db_user = session.exec(query)
+    db_user = session.exec(query).first()
+    return db_user
+
+
+def authenticate(session: Session, email: str, password: str) -> User:
+    db_user = get_user_by_email(session, email)
+    if not db_user:
+        return None
+    if not verify_password(password, db_user.hashed_password):
+        return None
     return db_user
 
 

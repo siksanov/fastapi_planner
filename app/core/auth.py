@@ -1,15 +1,14 @@
 import jwt
 import secrets
-from jwt.exceptions import JWTException
-from passlib.context import CryptContext
+from jwt.exceptions import InvalidTokenError
 from datetime import timedelta, datetime, timezone
 from typing import Any, Annotated
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends, status, HTTPException
-from models.user import User
-from sqlmodel import Session, SQLModel
+from app.models.user import User
+from sqlmodel import SQLModel
 from pydantic import ValidationError
-from db import get_user_by_email
+from app.core.db import SessionGet
 
 
 class TokenPayload(SQLModel):
@@ -17,10 +16,8 @@ class TokenPayload(SQLModel):
 
 
 reusable_oauth2 = OAuth2PasswordBearer(
-    'api/v1/login/token'
+    '/api/v1/users/signin'
 )
-
-context = CryptContext(schemes=['bcrypt'], deprecate='auto')
 
 ALGORITHM = 'HS256'
 
@@ -36,28 +33,11 @@ def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
     return encoded_jwt
 
 
-def verify_password(password: str, hashed_password: str):
-    return context.verify(password, hashed_password)
-
-
-def password_hash(password: str):
-    return context.hash(password)
-
-
-def authenticate(session: Session, email: str, password: str) -> User:
-    db_user = get_user_by_email(session, email)
-    if not db_user:
-        return None
-    if not verify_password(password, db_user.hashed_password):
-        return None
-    return db_user
-
-
-def auth_user(session: Session, token: TokenGet):
+def auth_user(session: SessionGet, token: TokenGet):
     try:
         payload = jwt.decode(token, secret, algorithms=[ALGORITHM])
         token_data = TokenPayload(**payload)
-    except HTTPException(JWTException, ValidationError):
+    except (InvalidTokenError, ValidationError):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             'Не удалось проверить учетные данные'

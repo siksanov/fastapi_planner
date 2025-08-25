@@ -2,8 +2,6 @@ import uuid
 from sqlmodel import SQLModel, Field, Relationship
 from pydantic import EmailStr
 
-from item import Item
-
 
 class UserBase(SQLModel):
     email: EmailStr = Field(unique=True, index=True, max_length=255)

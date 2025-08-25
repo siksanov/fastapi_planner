@@ -1,9 +1,17 @@
 import uuid
 from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select, func
-from models.item import Item, ItemsPublic, ItemPublic, ItemCreate, ItemUpdate
-from deps.db import SessionGet, create_item
-from deps.auth import AuthUser
+from typing import Any
+
+from app.models.item import (
+    Item,
+    ItemsPublic,
+    ItemPublic,
+    ItemCreate,
+    ItemUpdate
+)
+from app.core.db import SessionGet, create_item
+from app.core.auth import AuthUser
 
 
 router = APIRouter(prefix='/items', tags=['items'])
@@ -15,7 +23,7 @@ async def read_items(
     auth_user: AuthUser,
     skip: int = 0,
     limit: int = 100
-) -> ItemsPublic:
+) -> Any:
     count_statement = select(func.count()).select_from(Item)
     statement = select(Item).offset(skip).limit(limit)
     if not auth_user.is_superuser:
@@ -28,8 +36,8 @@ async def read_items(
             .where(Item.owner_id == auth_user.id)
         )
     count = session.exec(count_statement).one()
-    statement = session.exec(statement).all()
-    return ItemsPublic(count, statement)
+    items = session.exec(statement).all()
+    return ItemsPublic(data=items, count=count)
 
 
 @router.get('/{id}', response_model=ItemPublic)
@@ -37,31 +45,32 @@ async def read_item(
     session: SessionGet,
     auth_user: AuthUser,
     id: uuid.UUID
-) -> ItemPublic:
+) -> Any:
     item = session.get(Item, id)
     if not item:
         raise HTTPException(status.HTTP_404_NOT_FOUND, 'Элемент не найден')
     if not auth_user.is_superuser and (item.owner_id != auth_user.id):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Недостаточно прав')
+    return item
 
 
-@router.post('/', dependencies=AuthUser, response_model=ItemPublic)
+@router.post('/', response_model=ItemPublic)
 async def new_item(
     session: SessionGet,
     auth_user: AuthUser,
     item_create: ItemCreate
-) -> ItemPublic:
+) -> Any:
     item = create_item(session, item_create, auth_user.id)
     return item
 
 
-@router.put('/{id}', dependencies=AuthUser, response_model=ItemPublic)
+@router.put('/{id}', response_model=ItemPublic)
 async def update_item(
     session: SessionGet,
     auth_user: AuthUser,
     id: uuid.UUID,
     item_update: ItemUpdate
-) -> ItemPublic:
+) -> Any:
     item = session.get(Item, id)
     if not item:
         raise HTTPException(status.HTTP_404_NOT_FOUND, 'Элемент не найден')
@@ -74,7 +83,7 @@ async def update_item(
     return item
 
 
-@router.delete('/{id}', dependencies=AuthUser, response_model=dict)
+@router.delete('/{id}', response_model=dict)
 async def delete_item(
     session: SessionGet,
     auth_user: AuthUser,

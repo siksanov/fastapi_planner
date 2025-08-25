@@ -3,34 +3,35 @@ from datetime import timedelta
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import select, func
-from typing import Annotated
+from typing import Annotated, Any
 
-from models.user import (
+from app.models.user import (
     UsersPublic,
     UserPublic,
     User,
     UserRegister,
     UserCreate
 )
-from deps.db import (
+from app.core.db import (
     SessionGet,
     get_user_by_email,
-    create_user
+    create_user,
+    authenticate
 )
-from deps.auth import AuthUser, authenticate, create_access_token
+from app.core.auth import AuthUser, create_access_token
 
-router = APIRouter(prefix='/users', tags='users')
+router = APIRouter(prefix='/users', tags=['users'])
 
 
 @router.get('/', response_model=UsersPublic)
 async def read_users(
     session: SessionGet, skip: int = 0, limit: int = 100
-) -> UsersPublic:
-    count_statement = select(func.conut()).select_from(User)
+) -> Any:
+    count_statement = select(func.count()).select_from(User)
     count = session.exec(count_statement).one()
     statement = select(User).offset(skip).limit(limit)
     users = session.exec(statement).all()
-    return UsersPublic(count, users)
+    return UsersPublic(data=users, count=count)
 
 
 @router.get('/{id}', response_model=UserPublic | User)
@@ -38,7 +39,7 @@ async def read_user(
     user_id: uuid.UUID,
     session: SessionGet,
     auth_user: AuthUser
-) -> UserPublic | User:
+) -> Any:
     if user_id == auth_user.id:
         return auth_user
     user = session.get(User, user_id)
@@ -48,13 +49,14 @@ async def read_user(
 @router.post('/signup', response_model=UserPublic)
 async def register_user(
     session: SessionGet, user_register: UserRegister
-) -> User:
+) -> Any:
     user = get_user_by_email(session, user_register.email)
+    print(user)
     if user:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             'Пользователь с таким адресом электронной почты \
-                уже существует в системе')
+уже существует')
     user_create = UserCreate.model_validate(user_register)
     user = create_user(session, user_create)
     return user
@@ -64,7 +66,7 @@ async def register_user(
 async def login_user(
     session: SessionGet,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
-):
+) -> Any:
     user = authenticate(session, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -78,7 +80,7 @@ async def login_user(
         )
     access_token_expires = timedelta(minutes=60)
     token = create_access_token(user.id, access_token_expires)
-    return {'token': token, 'type': 'Bearer'}
+    return {'access_token': token, 'token_type': 'Bearer'}
 
 
 @router.patch('/{id}')
@@ -86,12 +88,12 @@ async def recovery_auth_user():
     pass
 
 
-@router.delete('/{id}', dependencies=AuthUser, response_model=dict)
+@router.delete('/{id}', response_model=dict)
 async def delete_user(
     session: SessionGet,
     auth_user: AuthUser,
     id: uuid.UUID
-) -> dict:
+) -> Any:
     user = session.get(User, id)
     if not user:
         raise HTTPException(
